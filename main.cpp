@@ -2,6 +2,8 @@
 #include <fstream>
 #include <vector>
 #include <set>
+#include <algorithm>
+#include <iterator>
 
 typedef struct {
     int states = 0;
@@ -47,6 +49,16 @@ std::set<int> lambdaClosure(std::set<int> states, int maxStates, std::vector<std
     } while (hasNew);
 
     return states;
+}
+
+std::vector<std::set<int>> getClosures(automata a) {
+    std::vector<std::set<int>> closures;
+    for (int i = 0; i < a.states; i++) {
+        std::set<int> states;
+        states.insert(i);
+        closures.push_back(lambdaClosure(states, a.states, a.rules));
+    }
+    return closures;
 }
 
 void read_automata(automata& a, std::string input) {
@@ -101,16 +113,32 @@ void rulesConvert(automata &a, std::vector<std::set<int>> input) {
     }
 }
 
+void removeNode(automata& a, int node) {
+    if (a.final_states.find(node) != a.final_states.end())
+        a.final_states.erase(a.final_states.find(node));
+
+    a.states--;
+
+    std::vector<std::vector<char>> oldrules;
+    a.rules.clear();
+    a.rules.resize(a.states * a.states);
+    for (int i = 0; i < a.states; i++) {
+        for (int j = 0; j < a.states; j++) {
+            int pos = 0;
+            if (i < node) pos += i * a.states;
+            else pos += (i + 1) * a.states;
+            if (j < node) pos += j;
+            else pos += j + 1;
+
+            a.rules[i * a.states + j] = oldrules[pos];
+        }
+    }
+}
+
 int main() {
     automata a;
     read_automata(a, "input.txt");
-    std::vector<std::set<int>> closures;
-
-    for (int i = 0; i < a.states; i++) {
-        std::set<int> states;
-        states.insert(i);
-        closures.push_back(lambdaClosure(states, a.states, a.rules));
-    }
+    std::vector<std::set<int>> closures = getClosures(a);
 
     std::vector<std::set<int>> newrules;
 
@@ -121,6 +149,27 @@ int main() {
             std::set<int> states;
             states.insert(x);
             newrules[x * a.alphabet.size() + c] = lambdaClosure(getStates(lambdaClosure(states, a.states, a.rules), a.alphabet[c], a.states, a.rules), a.states, a.rules);
+        }
+    }
+
+    rulesConvert(a, newrules);
+
+    for (int i = 0; i < a.states; i++) {
+        std::set<int> c = closures[i];
+        std::set<int> intersect;
+        std::set_intersection(c.begin(), c.end(), a.final_states.begin(), a.final_states.end(), std::inserter(intersect, intersect.begin()));
+        if (intersect.size() > 0) a.final_states.insert(i);
+    }
+
+    for (int i = 0; i < a.states; i++) {
+        for (int j = i + 1; i < a.states; i++) {
+            std::set<int> ci = closures[i], cj = closures[j];
+            
+            if (ci == cj && !(a.final_states.find(i) != a.final_states.end() ^ a.final_states.find(j) != a.final_states.end())) {
+                removeNode(a, i);
+                i--;
+                break;
+            }
         }
     }
 
