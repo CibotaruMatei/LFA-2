@@ -39,7 +39,7 @@ std::set<int> lambdaClosure(std::set<int> states, int maxStates, std::vector<std
         lambdas = getStates(states, '$', maxStates, rules);
         hasNew = false;
         for (auto& i : lambdas) {
-            if (states.find(i) != states.end()) {
+            if (states.find(i) == states.end()) {
                 hasNew = true;
                 break;
             }
@@ -135,11 +135,25 @@ void removeNode(automata& a, int node) {
     }
 }
 
+std::ostream& operator<<(std::ostream& os, const std::set<int>& s) {
+    for (auto& i : s) {
+        os << i << " ";
+    }
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const std::vector<std::set<int>>& s) {
+    for (int i = 0; i < s.size(); i++) {
+        os << i << ": " << s[i] << "\n";
+    }
+    return os << "\n";
+}
+
 int main() {
     automata a;
     read_automata(a, "input.txt");
     std::vector<std::set<int>> closures = getClosures(a);
-
+    std::cout << closures;
     std::vector<std::set<int>> newrules;
 
     newrules.resize(a.states * a.alphabet.size());
@@ -151,21 +165,34 @@ int main() {
             newrules[x * a.alphabet.size() + c] = lambdaClosure(getStates(lambdaClosure(states, a.states, a.rules), a.alphabet[c], a.states, a.rules), a.states, a.rules);
         }
     }
-
+    std::cout << newrules;
     rulesConvert(a, newrules);
 
     for (int i = 0; i < a.states; i++) {
         std::set<int> c = closures[i];
         std::set<int> intersect;
         std::set_intersection(c.begin(), c.end(), a.final_states.begin(), a.final_states.end(), std::inserter(intersect, intersect.begin()));
+        std::cout << intersect << "\n";
         if (intersect.size() > 0) a.final_states.insert(i);
     }
 
+    std::cout << "\n";
+
     for (int i = 0; i < a.states; i++) {
-        for (int j = i + 1; i < a.states; i++) {
-            std::set<int> ci = closures[i], cj = closures[j];
-            
-            if (ci == cj && !(a.final_states.find(i) != a.final_states.end() ^ a.final_states.find(j) != a.final_states.end())) {
+        for (int j = i + 1; j < a.states; j++) {
+            bool found = false;
+            for (int k = 0; k < a.alphabet.size(); k++) {
+                std::set<int> di = newrules[i * a.alphabet.size() + k];
+                std::set<int> dj = newrules[j * a.alphabet.size() + k];
+
+                if (di != dj) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found && !(a.final_states.find(i) != a.final_states.end() ^ a.final_states.find(j) != a.final_states.end())) {
+                std::cout << i << " " << j << "\n";
                 removeNode(a, i);
                 i--;
                 break;
